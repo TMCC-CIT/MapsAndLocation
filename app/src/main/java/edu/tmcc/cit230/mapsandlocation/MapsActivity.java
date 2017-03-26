@@ -141,9 +141,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions();
+            return;
+        }
+        mMap.setMyLocationEnabled(true);
+
         // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
+        double lat = -34.852;
+        double lon = 151.211;
+        AddMarkerToMap("Sydney, Australia", lat, lon);
+    }
+
+    private void AddMarkerToMap(String title, double lat, double lon) {
+        LatLng sydney = new LatLng(lat, lon);
+        mMap.addMarker(new MarkerOptions().position(sydney).title(title));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
     }
 
@@ -156,7 +168,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         if (mLastLocation != null) {
+            mCurrentLocation = mLastLocation;
             Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mLastLocation.getLatitude()), String.valueOf(mLastLocation.getLongitude())));
+            AddMarkerToMap("Current Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
         }
 
         if (mRequestingLocationUpdates) {
@@ -174,10 +188,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onLocationChanged(Location location) {
+        Log.d(MapsActivity.TAG, "Potential location change...");
+        if(mLastLocation.distanceTo(location) > 0.0f) {
+            mLastLocation = mCurrentLocation;
+        }
         mCurrentLocation = location;
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
         if (mCurrentLocation != null) {
             Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mCurrentLocation.getLatitude()), String.valueOf(mCurrentLocation.getLongitude())));
+            AddMarkerToMap("Current Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
         }
     }
 
