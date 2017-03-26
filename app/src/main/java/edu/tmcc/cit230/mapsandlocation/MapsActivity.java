@@ -10,6 +10,7 @@ import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -21,12 +22,13 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.text.DateFormat;
 import java.util.Date;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener, GoogleMap.OnMarkerClickListener {
 
     private static final String TAG = "MapsActivity";
     private static final int REQUEST_CURRENT_LOCATION = 1;
@@ -141,10 +143,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions();
+            return;
+        }
+        mMap.setMyLocationEnabled(true);
+
         // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+        double lat = -34.852;
+        double lon = 151.211;
+        AddMarkerToMap("Sydney, Australia", lat, lon);
+
+        // Set a listener for marker click.
+        mMap.setOnMarkerClickListener(this);
+
+    }
+
+    private void AddMarkerToMap(String title, double lat, double lon) {
+        LatLng position = new LatLng(lat, lon);
+        Marker marker = mMap.addMarker(new MarkerOptions().position(position).title(title));
+        marker.setTag(0);
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(position));
     }
 
     @Override
@@ -156,7 +175,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         if (mLastLocation != null) {
+            mCurrentLocation = mLastLocation;
             Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mLastLocation.getLatitude()), String.valueOf(mLastLocation.getLongitude())));
+            AddMarkerToMap("Current Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
         }
 
         if (mRequestingLocationUpdates) {
@@ -174,10 +195,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onLocationChanged(Location location) {
+        Log.d(MapsActivity.TAG, "Potential location change...");
+        if(mLastLocation.distanceTo(location) > 0.0f) {
+            mLastLocation = mCurrentLocation;
+        }
         mCurrentLocation = location;
         mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
         if (mCurrentLocation != null) {
             Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mCurrentLocation.getLatitude()), String.valueOf(mCurrentLocation.getLongitude())));
+            AddMarkerToMap("Current Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
         }
     }
 
@@ -204,6 +230,29 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
+    /** Called when the user clicks a marker. */
+    @Override
+    public boolean onMarkerClick(final Marker marker) {
+
+        // Retrieve the data from the marker.
+        Integer clickCount = (Integer) marker.getTag();
+
+        // Check if a click count was set, then display the click count.
+        if (clickCount != null) {
+            clickCount = clickCount + 1;
+            marker.setTag(clickCount);
+            Toast.makeText(this,
+                    marker.getTitle() +
+                            " has been clicked " + clickCount + " times.",
+                    Toast.LENGTH_LONG).show();
+        }
+
+        // Return false to indicate that we have not consumed the event and that we wish
+        // for the default behavior to occur (which is for the camera to move such that the
+        // marker is centered and for the marker's info window to open, if it has one).
+        return false;
+    }
+
     @Override
     public void onConnectionSuspended(int i) {
 
@@ -213,6 +262,4 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
     }
-
-
 }
