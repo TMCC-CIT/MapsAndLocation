@@ -2,16 +2,16 @@ package edu.tmcc.cit230.mapsandlocation;
 
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.os.Debug;
+import android.location.LocationManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
-import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.google.android.gms.awareness.fence.LocationFence;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -24,6 +24,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.text.DateFormat;
 import java.util.Date;
@@ -150,9 +151,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.setMyLocationEnabled(true);
 
         // Add a marker in Sydney and move the camera
+        // this code is for demonstrating the Polyline Maps API
         double lat = -34.852;
         double lon = 151.211;
-        AddMarkerToMap("Sydney, Australia", lat, lon);
+        mLastLocation = new Location("MapsActivity");
+        mLastLocation.setLatitude(lat);
+        mLastLocation.setLongitude(lon);
+        AddMarkerToMap("Sydney, Australia", mLastLocation.getLatitude(), mLastLocation.getLongitude());
 
         // Set a listener for marker click.
         mMap.setOnMarkerClickListener(this);
@@ -160,10 +165,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void AddMarkerToMap(String title, double lat, double lon) {
-        LatLng position = new LatLng(lat, lon);
-        Marker marker = mMap.addMarker(new MarkerOptions().position(position).title(title));
+        LatLng location = new LatLng(lat, lon);
+        Marker marker = mMap.addMarker(new MarkerOptions().position(location).title(title));
         marker.setTag(0);
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(position));
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(location));
     }
 
     @Override
@@ -173,11 +178,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             return;
         }
 
-        mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        if (mLastLocation != null) {
-            mCurrentLocation = mLastLocation;
-            Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mLastLocation.getLatitude()), String.valueOf(mLastLocation.getLongitude())));
-            AddMarkerToMap("Current Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+        mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        if (mCurrentLocation != null) {
+            Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mCurrentLocation.getLatitude()), String.valueOf(mCurrentLocation.getLongitude())));
+            updateMapUI("Current Location");
         }
 
         if (mRequestingLocationUpdates) {
@@ -197,13 +201,34 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onLocationChanged(Location location) {
         Log.d(MapsActivity.TAG, "Potential location change...");
         if(mLastLocation.distanceTo(location) > 0.0f) {
-            mLastLocation = mCurrentLocation;
+            mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
+            if (location != null) {
+                Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(location.getLatitude()), String.valueOf(location.getLongitude())));
+                updateMapUI("Current Location");
+                    mLastLocation = mCurrentLocation;
+                    mCurrentLocation = location;
+            }
         }
-        mCurrentLocation = location;
-        mLastUpdateTime = DateFormat.getTimeInstance().format(new Date());
-        if (mCurrentLocation != null) {
-            Log.d(MapsActivity.TAG, String.format("Last Known Location: LAT=%s, LON=%s", String.valueOf(mCurrentLocation.getLatitude()), String.valueOf(mCurrentLocation.getLongitude())));
-            AddMarkerToMap("Current Location", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+    }
+
+    private void updateMapUI(String locationTitle) {
+        if(mCurrentLocation == null || mLastLocation == null) {
+            return;
+        }
+        AddMarkerToMap(locationTitle, mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+        AddPolyLineToMap(mLastLocation, mCurrentLocation);
+    }
+
+    private void AddPolyLineToMap(Location mLastLocation, Location mCurrentLocation) {
+        if(mCurrentLocation == null || mLastLocation == null) {
+            return;
+        }
+        if(mLastLocation.distanceTo(mCurrentLocation) > 3.0f) { // distance in meters
+            mMap.addPolyline(new PolylineOptions()
+                    .clickable(true)
+                    .add(
+                            new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()),
+                            new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude())));
         }
     }
 
