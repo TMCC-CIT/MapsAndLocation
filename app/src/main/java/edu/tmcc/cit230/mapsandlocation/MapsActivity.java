@@ -43,7 +43,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Location mCurrentLocation;
     private String mLastUpdateTime;
     private final LocationRequest mLocationRequest;
-    private boolean mRequestingLocationUpdates;
+    private boolean mRequestingLocationUpdates = true;
 
     public MapsActivity() {
         mLocationRequest = LocationRequest.create();
